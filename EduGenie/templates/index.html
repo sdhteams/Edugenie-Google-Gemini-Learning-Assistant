@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduGenie - Personal AI Tutor</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to EduGenie 🧠✨</h1>
+        <p class="subtitle">Your personal AI tutor for learning support!</p>
+
+        <!-- Q&A -->
+        <form id="qaForm">
+            <label><strong>Ask EduGenie a Question:</strong></label><br><br>
+            <div class="input-group">
+                <input type="text" id="question" placeholder="Why is the sky blue?" required>
+                <button type="submit">Get Answer</button>
+            </div>
+        </form>
+        <div id="qaResult" class="output"></div>
+
+        <!-- Explanation -->
+        <form id="explainForm">
+            <label><strong>Need an Explanation?</strong></label><br><br>
+            <div class="input-group">
+                <input type="text" id="topic" placeholder="Photosynthesis" required>
+                <button type="submit">Explain</button>
+            </div>
+        </form>
+        <div id="explanationResult" class="output"></div>
+
+        <!-- Summary -->
+        <form id="summaryForm">
+            <label><strong>Summarize a Paragraph:</strong></label><br><br>
+            <div class="input-group">
+                <input type="text" id="summaryText" placeholder="Paste long content to summarize" required>
+                <button type="submit">Summarize</button>
+            </div>
+        </form>
+        <div id="summaryResult" class="output"></div>
+
+        <!-- Quiz -->
+        <form id="quizForm">
+            <label><strong>Generate a Quiz:</strong></label><br><br>
+            <div class="input-group">
+                <input type="text" id="quizText" placeholder="Solar System" required>
+                <button type="submit">Generate Quiz</button>
+            </div>
+        </form>
+        <div id="quizResult" class="output"></div>
+
+        <!-- Learning Recommendations -->
+        <form id="recommendForm">
+            <label><strong>Get Learning Recommendations:</strong></label><br><br>
+            <div class="input-group stacked">
+                <input type="text" id="recommendTopic" placeholder="e.g. Linear Regression" required>
+                <button type="submit">Get Recommendations</button>
+            </div>
+        </form>
+        <div id="recommendResult" class="output"></div>
+    </div>
+
+    <script>
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // 1. Q&A
+        document.getElementById("qaForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const question = document.getElementById("question").value.trim();
+            const resultDiv = document.getElementById("qaResult");
+            resultDiv.innerHTML = "<em>Thinking...</em>";
+
+            try {
+                const response = await fetch(`/qa?question=${encodeURIComponent(question)}`);
+                const data = await response.json();
+                resultDiv.innerHTML = `<strong>Answer:</strong><pre class="formatted-text">${escapeHtml(data.answer)}</pre>`;
+            } catch (err) {
+                resultDiv.innerHTML = `<span class="incorrect">Error: ${escapeHtml(err.message)}</span>`;
+            }
+        });
+
+        // 2. Explanation
+        document.getElementById("explainForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const topic = document.getElementById("topic").value.trim();
+            const resultDiv = document.getElementById("explanationResult");
+            resultDiv.innerHTML = "<em>Generating simplified explanation...</em>";
+
+            try {
+                const response = await fetch("/explain/", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ topic })
+                });
+                const data = await response.json();
+                if (data.error) {
+                    resultDiv.innerHTML = `<span class="incorrect">${escapeHtml(data.error)}</span>`;
+                } else {
+                    resultDiv.innerHTML = `<strong>Explanation:</strong><pre class="formatted-text">${escapeHtml(data.explanation)}</pre>`;
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `<span class="incorrect">Error: ${escapeHtml(err.message)}</span>`;
+            }
+        });
+
+        // 3. Summary
+        document.getElementById("summaryForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const text = document.getElementById("summaryText").value.trim();
+            const resultDiv = document.getElementById("summaryResult");
+            resultDiv.innerHTML = "<em>Summarizing paragraph...</em>";
+
+            try {
+                const response = await fetch("/summarize/", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text })
+                });
+                const data = await response.json();
+                if (data.error) {
+                    resultDiv.innerHTML = `<span class="incorrect">${escapeHtml(data.error)}</span>`;
+                } else {
+                    resultDiv.innerHTML = `<strong>Summary:</strong><pre class="formatted-text">${escapeHtml(data.summary)}</pre>`;
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `<span class="incorrect">Error: ${escapeHtml(err.message)}</span>`;
+            }
+        });
+
+        // 4. Quiz
+        document.getElementById("quizForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const text = document.getElementById("quizText").value.trim();
+            const resultDiv = document.getElementById("quizResult");
+            resultDiv.innerHTML = "<em>Generating 3-question quiz...</em>";
+
+            try {
+                const response = await fetch("/quiz", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text })
+                });
+                const data = await response.json();
+
+                if (!data.quiz || !Array.isArray(data.quiz) || data.quiz[0]?.error) {
+                    const errMsg = data.quiz?.[0]?.error || data.error || "Could not generate quiz.";
+                    resultDiv.innerHTML = `<span class="incorrect">${escapeHtml(errMsg)}</span>`;
+                    return;
+                }
+
+                let html = `<strong>Quiz:</strong><div class="quiz-container">`;
+                data.quiz.forEach((item, index) => {
+                    html += `
+                        <div class="quiz-question-block" id="qblock-${index}">
+                            <p class="quiz-question"><strong>Q${index + 1}: ${escapeHtml(item.question)}</strong></p>
+                            <div class="quiz-options">
+                    `;
+                    item.options.forEach((opt) => {
+                        html += `
+                            <label class="quiz-option">
+                                <input type="radio" name="quiz-q-${index}" value="${escapeHtml(opt)}">
+                                ${escapeHtml(opt)}
+                            </label><br>
+                        `;
+                    });
+                    html += `
+                            </div>
+                            <button type="button" class="check-btn" onclick="checkQuizAnswer(${index}, '${escapeHtml(item.answer).replace(/'/g, "\\'")}')">Check Answer</button>
+                            <div id="feedback-${index}" class="quiz-feedback"></div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+                resultDiv.innerHTML = html;
+            } catch (err) {
+                resultDiv.innerHTML = `<span class="incorrect">Error: ${escapeHtml(err.message)}</span>`;
+            }
+        });
+
+        function checkQuizAnswer(questionIndex, correctAnswer) {
+            const selected = document.querySelector(`input[name="quiz-q-${questionIndex}"]:checked`);
+            const feedbackDiv = document.getElementById(`feedback-${questionIndex}`);
+
+            if (!selected) {
+                feedbackDiv.innerHTML = `<span class="incorrect">⚠️ Please select an option first.</span>`;
+                return;
+            }
+
+            const txt = document.createElement("textarea");
+            txt.innerHTML = correctAnswer;
+            const decodedCorrect = txt.value;
+
+            if (selected.value.trim() === decodedCorrect.trim()) {
+                feedbackDiv.innerHTML = `<span class="correct">✅ Correct!</span>`;
+            } else {
+                feedbackDiv.innerHTML = `<span class="incorrect">❌ Incorrect. Correct answer: ${escapeHtml(decodedCorrect)}</span>`;
+            }
+        }
+
+        // 5. Learning Recommendations
+        document.getElementById("recommendForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const topic = document.getElementById("recommendTopic").value.trim();
+            const resultDiv = document.getElementById("recommendResult");
+            resultDiv.innerHTML = "<em>Building personalized learning path...</em>";
+
+            try {
+                const response = await fetch(`/learn/recommendations?topic=${encodeURIComponent(topic)}`);
+                const data = await response.json();
+                resultDiv.innerHTML = `<strong>Learning Recommendations for "${escapeHtml(data.topic)}":</strong><pre class="formatted-text">${escapeHtml(data.recommendation)}</pre>`;
+            } catch (err) {
+                resultDiv.innerHTML = `<span class="incorrect">Error: ${escapeHtml(err.message)}</span>`;
+            }
+        });
+    </script>
+</body>
+</html>
